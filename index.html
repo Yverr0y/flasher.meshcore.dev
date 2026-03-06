@@ -5,9 +5,9 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>MeshCore flasher</title>
-  <link href="./css/beer.css" rel="stylesheet">
-  <link href="./css/flasher.css" rel="stylesheet">
-  <script type="module" src="./flasher.js"></script>
+  <link href="/css/beer.css" rel="stylesheet">
+  <link href="/css/flasher.css" rel="stylesheet">
+  <script type="module" src="/flasher.js"></script>
 </head>
 
 <body class="dark">
@@ -108,7 +108,8 @@
               <i>arrow_drop_down</i>
             </div>
             <div class="max pre" v-if="getSelFwValue('notes')">
-              <b>Changelog:</b><br>{{ getSelFwValue('notes').replace('Change log:\r\n', '') }}
+              <b>Changelog:</b><br>
+              <span v-html="getSelFwValue('notes').replace('Change log:\r\n', '')"></span>
             </div>
           </nav>
         </header>
@@ -217,7 +218,7 @@
           <nav>
             <i>bolt</i>
             <h5 class="small max logo-top">
-              <img src="img/meshcore.svg"> <span>flasher</span>
+              <img src="/img/meshcore.svg"> <span>flasher</span>
             </h5>
             <button class="transparent hide-mobile" @click="openSerialGUI()">
               <i>manufacturing</i>
@@ -244,12 +245,17 @@
             <details open>
               <summary style="background-color: var(--surface-container)">
                 <div>
-                  <strong>{{ type === 'community' ? 'Community Firmware' : 'Ripple Firmware' }}</strong>
+                  <strong v-if="type === 'ripple'">Ripple Firmware</strong>
+                  <strong v-else-if="type === 'meshos'">MeshOS Firmware</strong>
+                  <strong v-else-if="type === 'community'">Community Firmware</strong>
                   <div class="tooltip right max">
                     <template v-if="type === 'ripple'">
                       Freemium firmware provided by <a class="inverse-link" target="_blank" href="https://buymeacoffee.com/ripplebiz">Ripple Radios</a>
                     </template>
-                    <template v-else>
+                    <template v-if="type === 'meshos'">
+                      Freemium firmware provided by Andy Kirby
+                    </template>
+                    <template v-else-if="type === 'community'">
                       Open Source <a class="inverse-link" target="_blank" href="https://github.com/meshcore-dev/MeshCore">Community firmware</a>
                     </template>
                   </div>
@@ -305,6 +311,6 @@
       </pre>
     </div>
   </div>
-  <script src="./lib/iframeResizer.contentWindow.min.js"></script>
+  <script src="/lib/iframeResizer.contentWindow.min.js"></script>
 </body>
 </html>

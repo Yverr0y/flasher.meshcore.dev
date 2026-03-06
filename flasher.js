@@ -1,10 +1,12 @@
-import "./lib/beer.min.js";
-import { createApp, reactive, ref, nextTick, watch, computed } from "./lib/vue.min.js";
-import { Dfu } from "./lib/dfu.js";
-import { ESPLoader, Transport, HardReset } from "./lib/esp32.js";
-import { SerialConsole } from './lib/console.js';
+import "/lib/beer.min.js";
+import { createApp, reactive, ref, nextTick, watch, computed } from "/lib/vue.min.js";
+import { Dfu } from "/lib/dfu.js";
+import { ESPLoader, Transport, HardReset } from "/lib/esp32.js";
+import { SerialConsole } from '/lib/console.js';
 
-const configRes = await fetch('./config.json');
+const searchParams = new URLSearchParams(location.search);
+const configName = searchParams.get('config')?.replaceAll(/[^a-z_-]/g, '') ?? 'config';
+const configRes = await fetch(`/${configName}.json`);
 const config = await configRes.json();
 
 const githubRes = await fetch('/releases');
@@ -129,6 +131,7 @@ function setup() {
     firmware: null,
     version: null,
     wipe: false,
+    espFlashAddress: 0x10000,
     nrfEraserFlashingPercent: 0,
     nrfEraserFlashing: false,
     port: null,
@@ -302,6 +305,7 @@ function setup() {
       );
 
       selected.wipe = true;
+      selected.espFlashAddress = 0;
     }
 
     selected.firmware = {
@@ -387,6 +391,7 @@ function setup() {
       let flashFile;
       if(device.type === 'esp32') {
         flashFile = flashFiles.find(f => f.type === (selected.wipe ? 'flash-wipe' : 'flash-update'));
+        if(selected.wipe) selected.espFlashAddress = 0x00000;
       }
       else {
         flashFile = flashFiles[0];
@@ -422,7 +427,7 @@ function setup() {
         enableTracing: false,
         fileArray: [{
           data: await blobToBinaryString(flashData),
-          address: selected.wipe ? 0x00000 : 0x10000
+          address: selected.espFlashAddress
         }],
         reportProgress: async (_, written, total) => {
           flashing.percent = (written / total) * 100;
@@ -481,12 +486,12 @@ function setup() {
   };
 
   const devices = computed(() => {
-    const classSortPrefix = (d) => d.class === 'ripple' ? '1' : '2';
+    const classes = ['ripple', 'meshos', 'community'];
     const deviceGroups = {};
-
-    for(const cls of ['ripple', 'community']) {
+    let index = 0;
+    for(const cls of classes) {
       const devices = config.device.toSorted(
-        (a, b) => (classSortPrefix(a) + a.maker + a.name).localeCompare(classSortPrefix(b) + b.maker + b.name)
+        (a, b) => (index + a.maker + a.name).localeCompare(index + b.maker + b.name)
       ).filter(
         d => d.class === cls && (deviceFilterText.value == '' || d.name.toLowerCase().includes(deviceFilterText.value?.toLowerCase()))
       )

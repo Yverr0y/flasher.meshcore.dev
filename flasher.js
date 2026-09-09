@@ -109,6 +109,9 @@ async function addGithubFiles() {
   }
 
   config.device = config.device.filter(device => device.firmware.some(firmware => Object.keys(firmware.version).length > 0 ));
+  for(const device of config.device) {
+    if(!Array.isArray(device.firmware)) console.error(device)
+  }
 
   return config;
 }

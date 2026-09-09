@@ -109,7 +109,10 @@
               <i>arrow_drop_down</i>
             </div>
             <div class="max pre" v-if="getSelFwValue('notes')">
-              <b>Changelog:</b><br>{{ getSelFwValue('notes').replace('Change log:\r\n', '') }}
+              <b>Changelog:</b><br>
+              <read-more max-height="300px">
+                <span v-html="formatChangeLog(getSelFwValue('notes'))"></span>
+              </read-more>
             </div>
           </nav>
         </header>
@@ -185,6 +188,9 @@
             <li v-if="selected.device.type === 'nrf52' && selected.device.erase">
               <a data-ui="menu-selector" :href="`${config.staticPath}/${selected.device.erase.replace('.zip', '.uf2')}`" download>{{ selected.device.erase.replace('.zip', '.uf2') }}</a>
             </li>
+            <li v-if="selected.device.type === 'nrf52' && selected.device.bootloader" v-for="bootloader of selected.device.bootloader">
+              <a data-ui="menu-selector" :href="`${config.staticPath}/${bootloader}`" download>{{ bootloader }}</a>
+            </li>
           </menu>
           <div class="tooltip left max">Download a copy of the firmware files for use with other flashers</div>
         </button>
@@ -236,7 +242,7 @@
           <nav>
             <i>bolt</i>
             <h5 class="small max logo-top">
-              <img src="img/meshcore.svg"> <span>flasher</span>
+              <img :src="`/img/${logoFile}`" v-if="!isIframe"> <span>flasher</span>
             </h5>
             <button class="transparent hide-mobile" @click="openSerialGUI()">
               <i>manufacturing</i>
@@ -267,37 +273,18 @@
           <label>Filter</label>
         </div>
         <ul class="list border">
-          <li v-for="(deviceGroup, type) in devices">
-            <details open>
-              <summary style="background-color: var(--surface-container)">
-                <div>
-                  <strong>{{ type === 'community' ? 'Community Firmware' : 'Ripple Firmware' }}</strong>
-                  <div class="tooltip right max">
-                    <template v-if="type === 'ripple'">
-                      Freemium firmware provided by <a class="inverse-link" target="_blank" href="https://buymeacoffee.com/ripplebiz">Ripple Radios</a>
-                    </template>
-                    <template v-else>
-                      Open Source <a class="inverse-link" target="_blank" href="https://github.com/meshcore-dev/MeshCore">Community firmware</a>
-                    </template>
-                  </div>
-                </div>
-              </summary>
-              <ul class="list border">
-                <li v-for="device in deviceGroup">
-                  <template v-if="device.firmware.length > 0">
-                    <button class="device-select transparent" @click="selected.device = device">
-                      <img class="icon" :title="device.type" :src="`/img/${device.type}.svg`" v-if="device.type !== 'noflash'">
-                      <i v-else>developer_board</i>
-                      <span>{{ device.name }}</span>
-                      <div class="tooltip right max" v-if="device.tooltip" v-html="device.tooltip"></div>
-                      <div class="max"></div>
-                    </button>
-                    <div class="max"></div>
-                    <img class="icon" :src="device.icon" v-if="device.icon" >
-                  </template>
-                </li>
-              </ul>
-            </details>
+          <li v-for="device in devices">
+            <template v-if="device.firmware.length > 0">
+              <button class="device-select transparent" @click="selected.device = device">
+                <img class="icon" :title="device.type" :src="`/img/${device.type}.svg`" v-if="device.type !== 'noflash'">
+                <i v-else>developer_board</i>
+                <span>{{ device.name }}</span>
+                <div class="tooltip right max" v-if="device.tooltip" v-html="device.tooltip"></div>
+                <div class="max"></div>
+              </button>
+              <div class="max hide-mobile"></div>
+              <img class="icon hide-mobile" :src="device.icon" v-if="device.icon" >
+            </template>
           </li>
           <li>
             <label>
@@ -332,6 +319,5 @@
       </pre>
     </div>
   </div>
-  <script src="./lib/iframeResizer.contentWindow.min.js"></script>
 </body>
 </html>

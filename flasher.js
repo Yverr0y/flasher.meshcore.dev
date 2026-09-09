@@ -454,6 +454,7 @@ function setup() {
 
       selected.wipe = true;
       selected.espFlashAddress = 0;
+      selected.espFlashAddress = 0;
     }
 
     selected.firmware = {
@@ -537,6 +538,7 @@ function setup() {
       let flashFile;
       if(device.type === 'esp32') {
         flashFile = flashFiles.find(f => f.type === (selected.wipe ? 'flash-wipe' : 'flash-update'));
+        if(selected.wipe) selected.espFlashAddress = 0x00000;
         if(selected.wipe) selected.espFlashAddress = 0x00000;
       }
       else {
@@ -708,6 +710,8 @@ function setup() {
     sendCommand, openSerialGUI,
     retry, close, commandReference,
     stepBack,
+    customFirmwareLoad, getFirmwarePath,
+    getSelFwValue, getRoleFwValue, getNotice, formatChangeLog,
     customFirmwareLoad, getFirmwarePath,
     getSelFwValue, getRoleFwValue, getNotice, formatChangeLog,
     firmwareHasData,

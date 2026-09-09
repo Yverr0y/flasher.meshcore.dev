@@ -1,6 +1,10 @@
 {
 	"staticPath": "/firmware",
 	"role": {
+		"meshos": {
+			"icon": "dashboard",
+			"title": "MeshOS"
+		},
 		"gui": {
 			"icon": "gradient",
 			"title": "Ripple GUI",
@@ -1500,7 +1504,17 @@
 							"download": "LilyGo_T-Echo_Card_[rR]epeater.*?\\.uf2"
 						}
 					}
-				},
+				}
+			]
+		},
+		{
+			"maker": "lilygo",
+			"class": "meshos",
+			"name": "LilyGo T-Lora Pager",
+			"tooltip": "<img class='device' src='/img/lilygo_pager.svg'>",
+			"icon": "/img/lora.svg",
+			"type": "esp32",
+			"firmware": [
 				{
 					"class": "community",
 					"role": "roomServer",
@@ -2142,6 +2156,7 @@
 					"title": "[R8] Repeater",
 					"class": "community",
 					"role": "repeater",
+					"notice": "otafixRecommended",
 					"github": {
 						"type": "repeater",
 						"files": {
@@ -2154,6 +2169,7 @@
 					"title": "[R8] Room Server",
 					"class": "community",
 					"role": "roomServer",
+					"notice": "otafixRecommended",
 					"github": {
 						"type": "room-server",
 						"files": {
@@ -2567,6 +2583,8 @@
 					"github": {
 						"type": "repeater",
 						"files": {
+							"flash": "Heltec_t114_without_display_[rR]epeater.*?\\.zip",
+							"download": "Heltec_t114_without_display_[rR]epeater.*?\\.uf2"
 							"flash": "Mesh_pocket_[rR]epeater.*?\\.zip",
 							"download": "Mesh_pocket_[rR]epeater.*?\\.uf2"
 						}
@@ -2639,6 +2657,7 @@
 				{
 					"class": "community",
 					"role": "repeater",
+					"notice":"otafixRecommended",
 					"github": {
 						"type": "repeater",
 						"files": {
@@ -2650,6 +2669,7 @@
 				{
 					"class": "community",
 					"role": "roomServer",
+					"notice":"otafixRecommended",
 					"github": {
 						"type": "room-server",
 						"files": {
@@ -2730,6 +2750,27 @@
 						"files": {
 							"flash": "Heltec_tower_v2_room_server.*?\\.zip",
 							"download": "Heltec_tower_v2_room_server.*?\\.uf2"
+						}
+					}
+				},
+				{
+					"class": "community",
+					"role": "kissRadio",
+					"notice": "kissRadioNotice",
+					"version": {
+						"1.17.1": {
+							"files": [
+								{
+									"type": "flash",
+									"name": "Heltec_mesh_solar_kiss_modem-1.17.1-45c0c323.zip",
+									"title": "Firmware OTA zip"
+								},
+								{
+									"type": "download",
+									"name": "Heltec_mesh_solar_kiss_modem-1.17.1-45c0c323.uf2",
+									"title": "Firmware uf2"
+								}
+							]
 						}
 					}
 				}
@@ -3587,6 +3628,7 @@
 					"class": "community",
 					"role": "repeater",
 					"notice": "otafixRecommended",
+					"notice": "otafixRecommended",
 					"github": {
 						"type": "repeater",
 						"files": {
@@ -3598,6 +3640,7 @@
 				{
 					"class": "community",
 					"role": "roomServer",
+					"notice": "otafixRecommended",
 					"notice": "otafixRecommended",
 					"github": {
 						"type": "room-server",
@@ -3749,6 +3792,7 @@
 					"class": "community",
 					"role": "repeater",
 					"notice": "otafixRecommended",
+					"notice": "otafixRecommended",
 					"github": {
 						"type": "repeater",
 						"files": {
@@ -3760,6 +3804,7 @@
 				{
 					"class": "community",
 					"role": "roomServer",
+					"notice": "otafixRecommended",
 					"notice": "otafixRecommended",
 					"github": {
 						"type": "room-server",
@@ -3830,6 +3875,7 @@
 					"class": "community",
 					"role": "repeater",
 					"notice": "otafixNeeded",
+					"notice": "otafixNeeded",
 					"github": {
 						"type": "repeater",
 						"files": {
@@ -3841,6 +3887,7 @@
 				{
 					"class": "community",
 					"role": "roomServer",
+					"notice": "otafixNeeded",
 					"notice": "otafixNeeded",
 					"github": {
 						"type": "room-server",
@@ -3944,6 +3991,7 @@
 				{
 					"class": "community",
 					"role": "repeater",
+					"notice": "otafixNeeded",
 					"github": {
 						"type": "repeater",
 						"files": {
@@ -3955,6 +4003,7 @@
 				{
 					"class": "community",
 					"role": "roomServer",
+					"notice": "otafixNeeded",
 					"github": {
 						"type": "room-server",
 						"files": {
@@ -4024,6 +4073,7 @@
 					"class": "community",
 					"role": "repeater",
 					"notice": "otafixNeeded",
+					"notice": "otafixNeeded",
 					"github": {
 						"type": "repeater",
 						"files": {
@@ -4035,6 +4085,7 @@
 				{
 					"class": "community",
 					"role": "roomServer",
+					"notice": "otafixNeeded",
 					"notice": "otafixNeeded",
 					"github": {
 						"type": "room-server",
@@ -4256,6 +4307,7 @@
 					"class": "community",
 					"role": "repeater",
 					"notice": "otafixNeeded",
+					"notice": "otafixNeeded",
 					"github": {
 						"type": "repeater",
 						"files": {
@@ -4267,6 +4319,7 @@
 				{
 					"class": "community",
 					"role": "roomServer",
+					"notice": "otafixNeeded",
 					"notice": "otafixNeeded",
 					"github": {
 						"type": "room-server",

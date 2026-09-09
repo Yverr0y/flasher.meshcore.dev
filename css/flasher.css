@@ -102,6 +102,10 @@ body:has([v-cloak]):after {
   white-space-collapse: preserve;
   min-width: 300px;
 }
+#app a {
+  text-decoration: underline;
+}
+
 #app .version {
   flex-wrap: wrap;
 }
@@ -116,6 +120,19 @@ body:has([v-cloak]):after {
   height: 20px;
 }
 
+#app .welcome-banner {
+  background-color: var(--primary-container);
+  color: var(--on-primary-container);
+  display: flex;
+  justify-content: space-between;
+  align-content: center;
+  padding: 0.5rem 1rem;
+}
+
+#app .welcome-banner span {
+  margin: auto 0;
+}
+
 .flash-container {
   padding-bottom: 150px;
 }
@@ -126,4 +143,13 @@ body:has([v-cloak]):after {
 
 .text-wrap {
   text-wrap: auto;
+}
+
+@media screen and (width <= 540px) {
+  .hide-mobile {
+    display: none !important;
+  }
+  .tooltip {
+    display: none !important;
+  }
 }

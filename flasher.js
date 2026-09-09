@@ -3,14 +3,16 @@ import { createApp, reactive, ref, nextTick, watch, computed } from "/lib/vue.mi
 import { Dfu } from "/lib/dfu.js";
 import { ESPLoader, Transport, HardReset } from "/lib/esp32.js";
 import { SerialConsole } from '/lib/console.js';
+import ReadMore from '/lib/overflow.vue.js';
 
+const logoFile = location.host === 'zephcore.meshcore.dev' ? 'zephcore.svg' : 'meshcore.svg';
 const searchParams = new URLSearchParams(location.search);
-const configName = searchParams.get('config')?.replaceAll(/[^a-z_-]/g, '') ?? 'config';
-const configRes = await fetch(`/${configName}.json`);
+const configParam = searchParams.get('config') ?? (location.host === 'zephcore.meshcore.dev' && 'config-zephcore' || '');
+const configName = configParam?.replaceAll(/[^a-z_-]/g, '');
+const configRes = await fetch(`/${configName || 'config'}.json`);
 const config = await configRes.json();
 
-const githubRes = await fetch('/releases');
-const github = await githubRes.json();
+const repos = {};
 
 const commandReference  = {
   'time ': 'Set time {epoch-secs}',
@@ -47,20 +49,28 @@ async function delay(milis) {
   return await new Promise((resolve) => setTimeout(resolve, milis));
 }
 
-function getGithubReleases(roleType, files) {
+function toSlug(text) {
+  return String(text).toLowerCase()
+    .replace(/[^a-z0-9.]+/g, '-')
+    .replace(/^-|-$/g, '');
+}
+
+function getGithubReleases(github) {
   const versions = {};
-  for(const [fileType, matchRE] of Object.entries(files)) {
-    for(const versionType of github) {
-      if(versionType.type !== roleType) { continue }
+
+  for(const [fileType, matchRE] of Object.entries(github.def.files)) {
+    for(const versionType of github.repo) {
+      if(versionType.type !== github.def.type) { continue }
       const version = versions[versionType.version] ??= {
         notes: versionType.notes,
         files: []
       };
       for(const file of versionType.files) {
+
         if(!new RegExp(matchRE).test(file.name)) { continue }
         version.files.push({
           type: fileType,
-          name: file.url,
+          name: `${file.url}?repo=${github.key}`,
           title: file.name,
         })
       }
@@ -70,12 +80,26 @@ function getGithubReleases(roleType, files) {
   return versions;
 }
 
-function addGithubFiles() {
+async function getGithub(firmware) {
+  const key = Object.keys(firmware).filter(name => name.startsWith('github'))
+
+  if(!repos[key]) {
+    repos[key] = await (await fetch(`/releases?repo=${key}`)).json()
+  }
+
+  return {
+    key,
+    repo: repos[key],
+    def: firmware[key]
+  }
+}
+
+async function addGithubFiles() {
   for(const device of config.device) {
     for(const firmware of device.firmware) {
-      const gDef = firmware.github;
-      if(!gDef?.files) { continue }
-      firmware.version = getGithubReleases(gDef.type, gDef.files);
+      const github = await getGithub(firmware);
+      if(!github?.def?.files) { continue }
+      firmware.version = getGithubReleases(github);
 
       // clean versions without files
       for(const [verName, verValue] of Object.entries(firmware.version)) {
@@ -89,18 +113,6 @@ function addGithubFiles() {
   return config;
 }
 
-async function digestMessage(message) {
-  const msgUint8 = new TextEncoder().encode(message); // encode as (utf-8) Uint8Array
-  const hashBuffer = await window.crypto.subtle.digest("SHA-256", msgUint8); // hash the message
-  const hashArray = Array.from(new Uint8Array(hashBuffer)); // convert buffer to byte array
-
-  const hashHex = hashArray
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join(""); // convert bytes to hex string
-
-  return hashHex;
-}
-
 async function blobToBinaryString(blob) {
   const bytes = new Uint8Array(await blob.arrayBuffer())
   let binString = '';
@@ -112,13 +124,14 @@ async function blobToBinaryString(blob) {
   return binString;
 }
 
-console.log(addGithubFiles());
-
 function setup() {
   const consoleEditBox = ref();
   const consoleWindow = ref();
 
   const deviceFilterText = ref('');
+
+  const isIframe = new URLSearchParams(location.search).get('iframe');
+  let displayWelcomeBanner = ref(isIframe && !localStorage.getItem('welcomeBannerDismissed'));
 
   const snackbar = reactive({
     text: '',
@@ -130,12 +143,18 @@ function setup() {
     device: null,
     firmware: null,
     version: null,
+    firmwareClass: null,
     wipe: false,
     espFlashAddress: 0x10000,
     nrfEraserFlashingPercent: 0,
     nrfEraserFlashing: false,
     port: null,
   });
+
+  const dismissWelcomeBanner = () => {
+    localStorage.setItem('welcomeBannerDismissed', '1');
+    displayWelcomeBanner.value = false;
+  }
 
   const getRoleFwValue = (firmware, key) => {
     const role = config.role[firmware.role] ?? {};
@@ -149,8 +168,42 @@ function setup() {
     return fwVersion ? fwVersion[key] || '' : '';
   }
 
+  const getNotice = (selected) => {
+    let notice = config.notice[selected.firmware.notice] || selected.firmware.notice || '';
+
+    if(notice) {
+      notice = notice.replaceAll(/\$\{(\w+)\}/g, (_, varName) => (Array.isArray(selected.device[varName]) ? selected.device[varName][0] : selected.device[varName]) || '');
+    }
+
+    return notice;
+  }
+
+  const checkChangeLogOverflow = () => {
+    const el = content.value
+    if (!el) return
+    // Compare full content height against the collapsed (clamped) height.
+    // Temporarily ignore overflow check while expanded.
+    if (expanded.value) {
+      isOverflowing.value = true
+      return
+    }
+    isOverflowing.value = el.scrollHeight > el.clientHeight
+  }
+
+  const formatChangeLog = (changelog) => {
+    return changelog
+      .replace(/^Release notes:'/, '')
+      .replace(/change log:\r?\n/i, '')
+      .replaceAll(/^[-*] /mg, '')
+      .replaceAll(/(?<!["'])(https?:\/\/[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_\+.~#?&//=]*))/gi, `<a target="_blank" href="$1">$1</a>`)
+      .replaceAll(/#(\d+)/gm, `<a target="_blank" href="https://github.com/meshcore-dev/MeshCore/pull/$1">#$1</a>`)
+//      .split(/\r?\n/)
+//      .map(l => `* ${l}`)
+//      .join('\n')
+  }
+
   const flashing = reactive({
-    supported: 'Serial' in window,
+    supported: 'Serial' in window || 'serial' in window.navigator,
     instance: null,
     locked: false,
     percent: 0,
@@ -201,6 +254,104 @@ function setup() {
     return firmware.version[firstVersion].files.length > 0;
   }
 
+  // --- URL Routing ---
+  // NOTE: the server must serve index.html for all paths (catch-all / try_files).
+
+  const deviceToSlug = (device) => {
+    const base = toSlug(device.name);
+    return selected.firmwareClass ? `${selected.firmwareClass}-${base}` : base;
+  };
+
+  const firmwareToSlug = (firmware) => {
+    const title = getRoleFwValue(firmware, 'title');
+    const subTitle = getRoleFwValue(firmware, 'subTitle');
+    return toSlug(subTitle ? `${title}-${subTitle}` : title);
+  };
+
+  let initializingFromUrl = false;
+
+  const buildUrl = () => {
+    if (serialCon.opened) return '/console';
+    if (!selected.device) return '/';
+    let path = '/' + deviceToSlug(selected.device) + '/';
+    if (!selected.firmware) return path;
+    path += firmwareToSlug(selected.firmware) + '/';
+    if (selected.version) path += toSlug(selected.version);
+    return path;
+  };
+
+  const updateUrl = (replace = false) => {
+    if (initializingFromUrl) return;
+    const path = buildUrl();
+    if (window.location.pathname !== path) {
+      replace ? history.replaceState(null, '', path) : history.pushState(null, '', path);
+    }
+  };
+
+  const applyUrlPath = (path) => {
+    initializingFromUrl = true;
+    const segments = path.replace(/^\/|\/$/g, '').split('/').filter(Boolean);
+
+    if (segments.length === 0 || segments[0] === 'console') {
+      nextTick(() => { initializingFromUrl = false; });
+      return;
+    }
+
+    const [deviceSlug, roleSlug, versionSlug] = segments;
+
+    // Detect optional firmware class prefix (e.g. "ripple-lilygo-t-deck")
+    const knownClasses = ['ripple', 'meshos', 'community'];
+    let firmwareClassFilter = null;
+    let bareDeviceSlug = deviceSlug;
+    for (const cls of knownClasses) {
+      if (deviceSlug.startsWith(cls + '-')) {
+        firmwareClassFilter = cls;
+        bareDeviceSlug = deviceSlug.slice(cls.length + 1);
+        break;
+      }
+    }
+    selected.firmwareClass = firmwareClassFilter;
+
+    const matchingDevices = config.device.filter(d => toSlug(d.name) === bareDeviceSlug);
+    if (matchingDevices.length === 0) {
+      nextTick(() => { initializingFromUrl = false; });
+      return;
+    }
+
+    // When multiple devices share the same slug, use the firmware slug to pick the right one
+    let device, firmware;
+    if (roleSlug && matchingDevices.length > 1) {
+      for (const d of matchingDevices) {
+        const f = d.firmware.find(f => firmwareToSlug(f) === roleSlug && firmwareHasData(f));
+        if (f) { device = d; firmware = f; break; }
+      }
+    }
+    if (!device) device = matchingDevices[0];
+    selected.device = device;
+
+    if (!roleSlug) {
+      nextTick(() => { initializingFromUrl = false; });
+      return;
+    }
+
+    if (!firmware) firmware = device.firmware.find(f => firmwareToSlug(f) === roleSlug && firmwareHasData(f));
+    if (!firmware) {
+      nextTick(() => { initializingFromUrl = false; });
+      return;
+    }
+    selected.firmware = firmware;
+
+    // Use nextTick so the firmware watcher sets the default version first,
+    // then we override it with the version from the URL.
+    nextTick(() => {
+      if (versionSlug) {
+        const versionName = Object.keys(firmware.version).find(v => toSlug(v) === versionSlug);
+        if (versionName) selected.version = versionName;
+      }
+      initializingFromUrl = false;
+    });
+  };
+
   const stepBack = () => {
     if(selected.device && selected.firmware) {
       if(selected.firmware.version[selected.version].customFile) {
@@ -215,13 +366,9 @@ function setup() {
 
     if(selected.device) {
       selected.device = null;
+      selected.firmwareClass = null;
     }
   }
-
-  watch(() => selected.firmware, (firmware) => {
-    if(firmware == null) return;
-    selected.version = Object.keys(firmware.version)[0];
-  });
 
   const flasherCleanup = async () => {
     flashing.active = false;
@@ -233,6 +380,7 @@ function setup() {
     selected.version = null;
     selected.wipe = false;
     selected.device = null;
+    selected.firmwareClass = null;
     selected.nrfEraserFlashingPercent = 0;
     selected.nrfEraserFlashing = false;
     if(flashing.instance instanceof ESPLoader) {
@@ -251,7 +399,7 @@ function setup() {
   }
 
   const openSerialGUI = () => {
-    window.open('https://config.meshcore.dev','meshcore_config','directories=no,titlebar=no,toolbar=no,location=no,status=no,menubar=no,scrollbars=no,resizable=no,width=1000,height=800');
+    window.open('https://config.meshcore.io','meshcore_config','directories=no,titlebar=no,toolbar=no,location=no,status=no,menubar=no,scrollbars=no,resizable=no,width=1000,height=800');
   }
 
   const openSerialCon = async() => {
@@ -382,8 +530,6 @@ function setup() {
       return;
     }
 
-    console.log({flashFiles});
-
     let flashData;
     if(flashFiles[0].file) {
       flashData = flashFiles[0].file;
@@ -486,19 +632,27 @@ function setup() {
   };
 
   const devices = computed(() => {
-    const classes = ['ripple', 'meshos', 'community'];
-    const deviceGroups = {};
-    let index = 0;
-    for(const cls of classes) {
-      const devices = config.device.toSorted(
-        (a, b) => (index + a.maker + a.name).localeCompare(index + b.maker + b.name)
-      ).filter(
-        d => d.class === cls && (deviceFilterText.value == '' || d.name.toLowerCase().includes(deviceFilterText.value?.toLowerCase()))
-      )
-      if(devices.length > 0) deviceGroups[cls] = devices;
-    }
+    return config.device
+      .toSorted((a, b) => a.name.localeCompare(b.name))
+      .filter(d => deviceFilterText.value === '' || d.name.toLowerCase().includes(deviceFilterText.value?.toLowerCase()));
+  });
 
-    return deviceGroups;
+  const deviceFirmwareByClass = computed(() => {
+    if (!selected.device) return {};
+    const classOrder = ['ripple', 'meshos', 'community'];
+    const groups = {};
+    for (const fw of selected.device.firmware) {
+      if (!firmwareHasData(fw)) continue;
+      if (selected.firmwareClass && fw.class !== selected.firmwareClass) continue;
+      const cls = fw.class || 'other';
+      if (!groups[cls]) groups[cls] = [];
+      groups[cls].push(fw);
+    }
+    const ordered = {};
+    for (const cls of [...classOrder, ...Object.keys(groups).filter(c => !classOrder.includes(c))]) {
+      if (groups[cls]) ordered[cls] = groups[cls];
+    }
+    return ordered;
   });
 
   const showMessage = (text, icon, displayMs) => {
@@ -521,19 +675,49 @@ function setup() {
     consoleEditBox.value.focus();
   }
 
+  watch(() => selected.firmware, (firmware) => {
+    if(firmware == null) return;
+    selected.version = Object.keys(firmware.version)[0];
+  });
+
+  watch(() => selected.device, updateUrl);
+  watch(() => selected.firmware, updateUrl);
+  watch(() => selected.version, () => updateUrl(true));  // replace: version is a refinement, not a new nav step
+  watch(() => serialCon.opened, updateUrl);
+
+  window.addEventListener('popstate', () => {
+    if (serialCon.opened) closeSerialCon();
+    flashing.active = false;
+    flashing.log = '';
+    flashing.error = '';
+    selected.firmware = null;
+    selected.version = null;
+    selected.device = null;
+    applyUrlPath(window.location.pathname);
+  });
+
+  applyUrlPath(window.location.pathname);
+
   return {
+    isIframe, displayWelcomeBanner, dismissWelcomeBanner,
     snackbar,
     consoleEditBox, consoleWindow, consoleMouseUp,
-    config, devices, selected, flashing, deviceFilterText,
+    config, devices, deviceFirmwareByClass, selected, flashing, deviceFilterText,
     flashDevice, flasherCleanup, dfuMode,
     serialCon, closeSerialCon, openSerialCon,
     sendCommand, openSerialGUI,
     retry, close, commandReference,
     stepBack,
-    customFirmwareLoad, getFirmwarePath, getSelFwValue, getRoleFwValue,
+    customFirmwareLoad, getFirmwarePath,
+    getSelFwValue, getRoleFwValue, getNotice, formatChangeLog,
     firmwareHasData,
-    canFlash, nrfErase
+    canFlash, nrfErase, logoFile
   }
 }
 
-createApp({ setup }).mount('#app');
+console.log(await addGithubFiles());
+
+createApp({
+  setup,
+  components: { ReadMore },
+}).mount('#app');

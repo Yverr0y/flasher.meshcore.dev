@@ -16,7 +16,7 @@
       <i v-if="snackbar.icon">{{ snackbar.icon }}</i>
       <span v-html="snackbar.text"></span>
     </div>
-    <div class="flash-container" data-iframe-height>
+    <div class="flash-container">
       <div v-if="flashing.active">
         <header>
           <nav>
@@ -57,7 +57,7 @@
                 <button @click="openSerialGUI()" v-if="selected.firmware.role === 'roomServer' || selected.firmware.role === 'repeater'">
                   <i>manufacturing</i>
                   <span>Configure via USB</span>
-                  <div class="tooltip left max">Open GUI to configure Repeaters and Room servers via USB serial</div>
+                  <div class="tooltip right max">Open GUI to configure Repeaters and Room servers via USB serial</div>
                 </button>
                 <button @click="close">
                   <i>arrow_back</i>
@@ -97,6 +97,7 @@
               </li>
             </ul>
           </article>
+          <div v-if="getNotice(selected)" v-html="getNotice(selected)"></div>
           <nav class="version">
             <div class="field label suffix border small">
               <select v-model="selected.version">
@@ -109,7 +110,9 @@
             </div>
             <div class="max pre" v-if="getSelFwValue('notes')">
               <b>Changelog:</b><br>
-              <span v-html="getSelFwValue('notes').replace('Change log:\r\n', '')"></span>
+              <read-more max-height="300px">
+                <span v-html="formatChangeLog(getSelFwValue('notes'))"></span>
+              </read-more>
             </div>
           </nav>
         </header>
@@ -185,6 +188,9 @@
             <li v-if="selected.device.type === 'nrf52' && selected.device.erase">
               <a data-ui="menu-selector" :href="`${config.staticPath}/${selected.device.erase.replace('.zip', '.uf2')}`" download>{{ selected.device.erase.replace('.zip', '.uf2') }}</a>
             </li>
+            <li v-if="selected.device.type === 'nrf52' && selected.device.bootloader" v-for="bootloader of selected.device.bootloader">
+              <a data-ui="menu-selector" :href="`${config.staticPath}/${bootloader}`" download>{{ bootloader }}</a>
+            </li>
           </menu>
           <div class="tooltip left max">Download a copy of the firmware files for use with other flashers</div>
         </button>
@@ -201,31 +207,49 @@
             <h6 class="small max">Choose role</h6>
           </nav>
         </header>
-        <ul class="list border">
-          <template v-for="firmware in selected.device.firmware">
-            <li v-if="firmwareHasData(firmware)" :class="getRoleFwValue(firmware, 'class')">
+        <template v-for="(fwGroup, fwClass) in deviceFirmwareByClass">
+          <ul class="list border">
+            <li style="background-color: var(--surface-container); padding: 0.25rem 1rem; font-weight: bold;">
+              <label v-if="fwClass === 'ripple'">
+                Ripple Firmware
+                <div class="tooltip right max">Freemium firmware provided by <a class="inverse-link" target="_blank" href="https://buymeacoffee.com/ripplebiz">Ripple Radios</a></div>
+              </label>
+              <label v-else-if="fwClass === 'meshos'">
+                MeshOS Firmware
+                <div class="tooltip right max">Freemium firmware provided by Andy Kirby</div>
+              </label>
+              <label v-else-if="fwClass === 'community'">
+                Community Firmware
+                <div class="tooltip right max">Open Source <a class="inverse-link" target="_blank" href="https://github.com/meshcore-dev/MeshCore">Community firmware</a></div>
+              </label>
+            </li>
+            <li v-for="firmware in fwGroup" :class="fwClass">
               <button class="transparent" @click="selected.firmware = firmware">
                 <i>{{ getRoleFwValue(firmware, 'icon') }}</i>
                 <span>{{ getRoleFwValue(firmware, 'title') }} {{ getRoleFwValue(firmware, 'subTitle') }}</span>
                 <div class="tooltip right max" v-if="getRoleFwValue(firmware, 'tooltip')" v-html="getRoleFwValue(firmware, 'tooltip')"></div>
               </button>
             </li>
-          </template>
-        </ul>
+          </ul>
+        </template>
       </div>
       <div v-else>
-        <header>
+      <article class="welcome-banner" v-if="displayWelcomeBanner">
+        <span>New to Meshcore? You can <a target="_blank" href="https://www.youtube.com/watch?v=ems9_XvdPX8">watch tutorial on how to flash your device</a></span>
+        <button class="circle small transparent no-margin" @click="dismissWelcomeBanner"><i>close</i></button>
+      </article>
+      <header>
           <nav>
             <i>bolt</i>
             <h5 class="small max logo-top">
-              <img src="/img/meshcore.svg"> <span>flasher</span>
+              <img :src="`/img/${logoFile}`" v-if="!isIframe"> <span>flasher</span>
             </h5>
             <button class="transparent hide-mobile" @click="openSerialGUI()">
               <i>manufacturing</i>
               <span>Repeater Setup</span>
               <div class="tooltip left max">Open GUI to configure Repeaters and Room servers via USB serial</div>
             </button>
-            <button class="transparent" @click="openSerialCon()">
+            <button class="transparent hide-mobile" @click="openSerialCon()">
               <i>terminal</i>
               <span>Console</span>
               <div class="tooltip left max">Open serial console to manage Routers and Room servers</div>
@@ -233,6 +257,14 @@
           </nav>
           <nav class="no-margin">
             <h6 class="small max">Choose device</h6>
+            <button class="border round error" data-ui="#donatemenu" title="Show some love to the developer">
+              <i>volunteer_activism</i>
+              <span>Donate</span>
+              <menu class="left no-wrap" id="donatemenu" data-ui="#donatemenu">
+                <li><a data-ui="menu-selector" target="_blank" href="https://github.com/sponsors/recrof?frequency=one-time">Github Sponsor</a></li>
+                <li><a data-ui="menu-selector" target="_blank" href="https://revolut.me/recrof">Revolut</a></li>
+              </menu>
+            </button>
           </nav>
         </header>
         <div class="field label prefix suffix border w-100 no-margin">
@@ -241,42 +273,18 @@
           <label>Filter</label>
         </div>
         <ul class="list border">
-          <li v-for="(deviceGroup, type) in devices">
-            <details open>
-              <summary style="background-color: var(--surface-container)">
-                <div>
-                  <strong v-if="type === 'ripple'">Ripple Firmware</strong>
-                  <strong v-else-if="type === 'meshos'">MeshOS Firmware</strong>
-                  <strong v-else-if="type === 'community'">Community Firmware</strong>
-                  <div class="tooltip right max">
-                    <template v-if="type === 'ripple'">
-                      Freemium firmware provided by <a class="inverse-link" target="_blank" href="https://buymeacoffee.com/ripplebiz">Ripple Radios</a>
-                    </template>
-                    <template v-if="type === 'meshos'">
-                      Freemium firmware provided by Andy Kirby
-                    </template>
-                    <template v-else-if="type === 'community'">
-                      Open Source <a class="inverse-link" target="_blank" href="https://github.com/meshcore-dev/MeshCore">Community firmware</a>
-                    </template>
-                  </div>
-                </div>
-              </summary>
-              <ul class="list border">
-                <li v-for="device in deviceGroup">
-                  <template v-if="device.firmware.length > 0">
-                    <button class="device-select transparent" @click="selected.device = device">
-                      <img class="icon" :title="device.type" :src="`/img/${device.type}.svg`" v-if="device.type !== 'noflash'">
-                      <i v-else>developer_board</i>
-                      <span>{{ device.name }}</span>
-                      <div class="tooltip right max" v-if="device.tooltip" v-html="device.tooltip"></div>
-                      <div class="max"></div>
-                    </button>
-                    <div class="max"></div>
-                    <img class="icon" :src="device.icon" v-if="device.icon" >
-                  </template>
-                </li>
-              </ul>
-            </details>
+          <li v-for="device in devices">
+            <template v-if="device.firmware.length > 0">
+              <button class="device-select transparent" @click="selected.device = device">
+                <img class="icon" :title="device.type" :src="`/img/${device.type}.svg`" v-if="device.type !== 'noflash'">
+                <i v-else>developer_board</i>
+                <span>{{ device.name }}</span>
+                <div class="tooltip right max" v-if="device.tooltip" v-html="device.tooltip"></div>
+                <div class="max"></div>
+              </button>
+              <div class="max hide-mobile"></div>
+              <img class="icon hide-mobile" :src="device.icon" v-if="device.icon" >
+            </template>
           </li>
           <li>
             <label>
@@ -311,6 +319,5 @@
       </pre>
     </div>
   </div>
-  <script src="/lib/iframeResizer.contentWindow.min.js"></script>
 </body>
 </html>
